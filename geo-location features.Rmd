@@ -1,0 +1,126 @@
+---
+title: "geolocation features"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(DT)
+library(tidyr)
+library(corrplot)
+library(leaflet)
+library(lubridate)
+setwd( "/Users/yeyazheng/Desktop/327")
+transactions=read.csv("train_2016_v2.csv")
+properties=fread("properties_2016.csv")
+transactions$transactiondate <-as.Date(transactions$transactiondate)
+transactions$transactiondateYYYYMM <-format(transactions$transactiondate, "%Y-%m")
+
+properties <- properties %>% rename(
+  id_parcel = parcelid,
+  build_year = yearbuilt,
+  area_basement = basementsqft,
+  area_patio = yardbuildingsqft17,
+  area_shed = yardbuildingsqft26, 
+  area_pool = poolsizesum,  
+  area_lot = lotsizesquarefeet, 
+  area_garage = garagetotalsqft,
+  area_firstfloor_finished = finishedfloor1squarefeet,
+  area_total_calc = calculatedfinishedsquarefeet,
+  area_base = finishedsquarefeet6,
+  area_live_finished = finishedsquarefeet12,
+  area_liveperi_finished = finishedsquarefeet13,
+  area_total_finished = finishedsquarefeet15,  
+  area_unknown = finishedsquarefeet50,
+  num_unit = unitcnt, 
+  num_story = numberofstories,  
+  num_room = roomcnt,
+  num_bathroom = bathroomcnt,
+  num_bedroom = bedroomcnt,
+  num_bathroom_calc = calculatedbathnbr,
+  num_bath = fullbathcnt,  
+  num_75_bath = threequarterbathnbr, 
+  num_fireplace = fireplacecnt,
+  num_pool = poolcnt,  
+  num_garage = garagecarcnt,  
+  region_county = regionidcounty,
+  region_city = regionidcity,
+  region_zip = regionidzip,
+  region_neighbor = regionidneighborhood,  
+  tax_total = taxvaluedollarcnt,
+  tax_building = structuretaxvaluedollarcnt,
+  tax_land = landtaxvaluedollarcnt,
+  tax_property = taxamount,
+  tax_year = assessmentyear,
+  tax_delinquency = taxdelinquencyflag,
+  tax_delinquency_year = taxdelinquencyyear,
+  zoning_property = propertyzoningdesc,
+  zoning_landuse = propertylandusetypeid,
+  zoning_landuse_county = propertycountylandusecode,
+  flag_fireplace = fireplaceflag, 
+  flag_tub = hashottuborspa,
+  quality = buildingqualitytypeid,
+  framing = buildingclasstypeid,
+  material = typeconstructiontypeid,
+  deck = decktypeid,
+  story = storytypeid,
+  heating = heatingorsystemtypeid,
+  aircon = airconditioningtypeid,
+  architectural_style= architecturalstyletypeid
+)
+transactions <- transactions %>% rename(
+  id_parcel = parcelid,
+  date = transactiondate
+)
+
+properties <- properties %>% 
+  mutate(tax_delinquency = ifelse(tax_delinquency=="Y",1,0),
+         flag_fireplace = ifelse(flag_fireplace=="Y",1,0),
+         flag_tub = ifelse(flag_tub=="Y",1,0))
+properties <- properties %>% mutate(census = as.character(rawcensustractandblock), tract_number = str_sub(census,5,11), tract_block = str_sub(census,12))
+
+train=merge(properties,transactions,by="id_parcel",all.y = T)
+
+location_variables <- c("latitude", "longitude", "fips", "region_county","region_city", "region_zip", "region_neighbor")
+
+properties %>% 
+  select_(.dots = location_variables) %>% 
+  summary()
+properties$latitude = properties$latitude/1000000
+properties$longitude = properties$longitude/1000000
+properties$pos = paste0(properties$longitude,"_", properties$latitude)
+
+
+# Keep rows that contain most complete lat&long information
+# Calculate for each row the number of non-missing values (count) and then 
+# just keep the rows where "count"" is equal to the max for that group.
+geolocation.dt <- setDT(properties[, c(location_variables, "pos")])
+coordinates = copy(geolocation.dt)
+coordinates = coordinates[, count := rowSums(!is.na(geolocation.dt))]
+coordinates = coordinates[ , max.count := max(count, na.rm = TRUE), 
+                           by = "pos"][count == max.count,.(region_county, region_city, region_neighbor,region_zip, latitude, longitude, pos)]
+coordinates = as.data.frame(coordinates)
+coordinates = coordinates [!duplicated(coordinates$pos),]
+
+# Remove location variables, except latitude and longitude
+properties = setDT(properties)
+properties[ , ':=' (region_county = NULL, 
+                         region_city = NULL, 
+                         region_neighbor = NULL,
+                         region_zip = NULL,
+                         pos = NULL),]
+coordinates = setDT(coordinates)
+
+# Merge with the coordinates data
+properties = coordinates[properties, ,on = c("latitude", "longitude")]
+properties= as.data.frame(properties)
+
+properties[is.na(properties$latitude), c("latitude")]   <- mean(properties$latitude, na.rm = TRUE)
+properties[is.na(properties$longitude), c("longitude")] <- mean(properties$longitude, na.rm = TRUE)
+lat_long <- properties[,c("longitude","latitude")]
+cl <- kmeans(lat_long, length(unique(properties$region_zip))) 
+
+```
