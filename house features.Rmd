@@ -1,0 +1,120 @@
+---
+title: "house features"
+output: html_document
+---
+
+```{r}
+#house features
+
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(DT)
+library(tidyr)
+library(corrplot)
+library(leaflet)
+library(lubridate)
+setwd( "/Users/yeyazheng/Desktop/327")
+transactions=read.csv("train_2016_v2.csv")
+properties=fread("properties_2016.csv")
+transactions$transactiondate <-as.Date(transactions$transactiondate)
+transactions$transactiondateYYYYMM <-format(transactions$transactiondate, "%Y-%m")
+
+properties <- properties %>% rename(
+  id_parcel = parcelid,
+  build_year = yearbuilt,
+  area_basement = basementsqft,
+  area_patio = yardbuildingsqft17,
+  area_shed = yardbuildingsqft26, 
+  area_pool = poolsizesum,  
+  area_lot = lotsizesquarefeet, 
+  area_garage = garagetotalsqft,
+  area_firstfloor_finished = finishedfloor1squarefeet,
+  area_total_calc = calculatedfinishedsquarefeet,
+  area_base = finishedsquarefeet6,
+  area_live_finished = finishedsquarefeet12,
+  area_liveperi_finished = finishedsquarefeet13,
+  area_total_finished = finishedsquarefeet15,  
+  area_unknown = finishedsquarefeet50,
+  num_unit = unitcnt, 
+  num_story = numberofstories,  
+  num_room = roomcnt,
+  num_bathroom = bathroomcnt,
+  num_bedroom = bedroomcnt,
+  num_bathroom_calc = calculatedbathnbr,
+  num_bath = fullbathcnt,  
+  num_75_bath = threequarterbathnbr, 
+  num_fireplace = fireplacecnt,
+  num_pool = poolcnt,  
+  num_garage = garagecarcnt,  
+  region_county = regionidcounty,
+  region_city = regionidcity,
+  region_zip = regionidzip,
+  region_neighbor = regionidneighborhood,  
+  tax_total = taxvaluedollarcnt,
+  tax_building = structuretaxvaluedollarcnt,
+  tax_land = landtaxvaluedollarcnt,
+  tax_property = taxamount,
+  tax_year = assessmentyear,
+  tax_delinquency = taxdelinquencyflag,
+  tax_delinquency_year = taxdelinquencyyear,
+  zoning_property = propertyzoningdesc,
+  zoning_landuse = propertylandusetypeid,
+  zoning_landuse_county = propertycountylandusecode,
+  flag_fireplace = fireplaceflag, 
+  flag_tub = hashottuborspa,
+  quality = buildingqualitytypeid,
+  framing = buildingclasstypeid,
+  material = typeconstructiontypeid,
+  deck = decktypeid,
+  story = storytypeid,
+  heating = heatingorsystemtypeid,
+  aircon = airconditioningtypeid,
+  architectural_style= architecturalstyletypeid
+)
+transactions <- transactions %>% rename(
+  id_parcel = parcelid,
+  date = transactiondate
+)
+
+properties <- properties %>% 
+  mutate(tax_delinquency = ifelse(tax_delinquency=="Y",1,0),
+         flag_fireplace = ifelse(flag_fireplace=="Y",1,0),
+         flag_tub = ifelse(flag_tub=="Y",1,0))
+properties <- properties %>% mutate(census = as.character(rawcensustractandblock), tract_number = str_sub(census,5,11), tract_block = str_sub(census,12))
+
+#train=merge(properties,transactions,by="id_parcel",all.y = T)
+
+
+df_train_features <- properties %>% 
+  mutate(
+    years_life = 2018 - build_year,    # life of property
+    living_area_error = area_total_calc /area_live_finished, # error in calculation of the finished living area
+    first_floor_living_area_error = area_unknown / area_firstfloor_finished, # error in size of the finished living area on the first (entry)
+    bathroom_nr_error = num_bathroom_calc / num_bathroom, # error in calculation of the number of bathrooms
+    bathroom_count_error = (num_75_bath + num_bath) / num_bathroom, # error in count of different number of bathrooms
+    avg_room_area_calc = area_total_calc /num_room, # average room size: calculated total finished living area / nr. rooms
+    avg_room_area = area_live_finished / num_room, # average room size: total finished living area / nr. rooms
+    living_area_prop2 = area_live_finished / area_total_finished,   # rate area living vs area total
+    bathroom_bedroom_ratio = num_bedroom / num_bath, # number of bathrooms per bedroom
+    bathroom_bedroom_ratio_calc = num_bathroom_calc / num_bedroom, # number of calculated bathrooms per bedroom
+    avg_bathroom_area_calc = area_total_calc / num_bath, # average bathroom size: calculated total finished living area / nr. rooms
+    avg_bathroom_area = area_live_finished / num_bathroom , # average bathroom size: total finished living area / nr. rooms
+    basement_area_ratio = area_basement / area_live_finished, # % of basement with respect to total finished living area 
+    basement_area_ratio_calc = area_basement / area_total_calc, # % of basement with respect to calculated total finished living area 
+    living_area_total_area_ratio_calc = area_total_calc / area_total_finished, # calculated total finished living area / total area
+    living_area_total_area_ratio = area_live_finished / area_total_finished, # total finished living area / total area
+    living_area_lot_area_calc = area_total_calc / area_lot, 
+ #calculated total finished living area /  area of the lot
+    living_area_lot_area = area_live_finished / area_lot, #total finished living area /  area of the lot
+    avg_size_pool = area_pool / num_pool, # average size of pool
+    pools_patio_ratio = area_pool / area_patio, #  % of area of pools in patio
+    pools_shed_ratio = area_shed / area_patio, # % of shed area in patio area
+    floor_shape_calc = area_liveperi_finished / area_total_calc, # living perimiter / living area - circular areas will have low ratio
+    floor_shape = area_liveperi_finished / area_live_finished, # living perimiter / calculate living area - long areas will have high ratio
+    num_fireplace_area = num_fireplace / area_total_finished # number of fireplace per area
+)
+summary(df_train_features)
+
+```
