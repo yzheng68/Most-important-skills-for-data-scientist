@@ -1,5 +1,5 @@
 #' reverse 
-#'
+#' reverse returns a copy of a vector whose elements are in the reverse order 
 #' @param x 
 #'
 #' @return
