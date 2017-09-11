@@ -10,16 +10,16 @@ I have two datasets as my training dataset. properties_2016.csv contains all the
 
 # Steps
 
-#1. EDA
+1. EDA
 
-#2. Feature engineer 
+2. Feature engineer 
 
-Deal with missing data
++ Deal with missing data
 
-Geo-location features (Latitude, longitude, zip, regioncity, regionneighbourhood, region county,  Federal Information Processing Standard code, etc.)
++ Geo-location features (Latitude, longitude, zip, regioncity, regionneighbourhood, region county,  Federal Information Processing Standard code, etc.)
 
-Properties features ( Number of bedrooms in home, number of bathrooms in home,total area, number of pools on the lot, total square footage of all pools on property,etc.)
++ Properties features ( Number of bedrooms in home, number of bathrooms in home,total area, number of pools on the lot, total square footage of all pools on property,etc.)
 
-Tax features (The total tax assessed value of the parcel,the year of the property tax assessment ,year for which the unpaid propert taxes were due, etc.)
++ Tax features (The total tax assessed value of the parcel,the year of the property tax assessment ,year for which the unpaid propert taxes were due, etc.)
 
-#3. Modeling 
+3. Modeling 
