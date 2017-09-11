@@ -1,9 +1,10 @@
 ---
-title: "zillow"
+title: "exploratory analysis"
+author: "Yeya"
 output: html_document
 ---
-exploratory analysis
-```{r,echo=FALSE,message=FALSE,warning=FALSE}
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE,results='hide'}
 library(data.table)
 library(dplyr)
 library(htmltools)
@@ -25,9 +26,13 @@ transactions[,transactiondateYYYYMM:=format(transactiondate, "%Y-%m")]
 
 properties [,`:=`(taxdelinquencyflag =ifelse(taxdelinquencyflag=="Y",1,0), fireplaceflag =ifelse(fireplaceflag=="Y",1,0), hashottuborspa = ifelse(hashottuborspa=="Y",1,0))]
 
-# perform the join using data.table
 dtrain <- properties[transactions]
 
+```
+
+Visualize properties on map. 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
 dtrain[, 
        list(label=HTML(
            paste(sep="<br>",
@@ -43,9 +48,11 @@ dtrain[,
     label = ~label,
     clusterOptions = markerClusterOptions()
     )
-zip_error=dtrain[, list(n=.N, mean_error=mean(logerror), st_dev_error=sd(logerror)), by='regionidzip']
-#96951 96207 96323 97331 error huge!
+```
 
+Examine the missing pattern 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
 missing_values <- dtrain %>% summarize_each(funs(sum(is.na(.))/n()))
 
 missing_values <- gather(missing_values, key="feature", value="missing_pct")
@@ -53,7 +60,30 @@ missing_values %>%
   ggplot(aes(x=reorder(feature,-missing_pct),y=missing_pct)) +
   geom_bar(stat="identity",fill="red")+
   coord_flip()+theme_bw()+ggtitle("Missing Pattern")
-bad_features=filter(missing_values,missing_pct>=0.1)
+```
+
+Lots of features contain high percentage of NAs. Need to deal with these features later. 
+
+Examine the distribution of log error 
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+plot(density(dtrain$logerror),type="l")
+
+cat("Log error are normally distributed. For those properties with log error 2 SDs above the mean, I labeled them as overestimated outliers, for those properties with log error 2 SDs below the mean, I labeled them as underestimated outliers. I examined the latitude and longitude distributions of these outliers. ")
+
+ub=mean(dtrain$logerror)+2*sd(dtrain$logerror)
+lb=mean(dtrain$logerror)-2*sd(dtrain$logerror)
+
+tmp=dtrain[,type:=ifelse(logerror>ub,2,ifelse(logerror<lb,1,0))]
+
+
+ggplot(data=tmp,aes(x=latitude,y=longitude,group=as.factor(type),colour=as.factor(type)))+geom_point()
+
+```
+
+Examine distribution of # of transactions by day and absolute mean logerror by day.  
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
 dtrain %>% 
   group_by(transactiondate) %>% count() %>% 
   ggplot(aes(x=transactiondate,y=n)) +
@@ -63,7 +93,11 @@ dtrain %>%
   group_by(transactiondate) %>% summarise(med_error=abs(mean(logerror,na.rm=T)))%>% 
   ggplot(aes(x=transactiondate,y=med_error)) +
   geom_bar(stat="identity", fill="red")+ggtitle("Absolute Mean Logerror by Date")
+```
 
+Examine the variation in log error across various discrete and continuous features. Found some interesting pattern with yearbuilt, number of bedrooms, number of bathrooms, fireplacecnt, garagecarcnt, Number of Units,propertylandusetypeid
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
 
 dtrain %>% 
   group_by(yearbuilt) %>% summarise(med_error=abs(mean(logerror,na.rm=T)))%>% 
@@ -96,17 +130,30 @@ ggplot(data=dtrain, aes(x=as.factor(unitcnt), y=abs(logerror))) +
     geom_boxplot(outlier.color=NA, color='steelblue')+labs(x='Number of Units', title='Distribution of absolute log error by Unit count')
 
 
+ggplot(data=dtrain, aes(x=as.factor(propertylandusetypeid), y=abs(logerror))) + geom_jitter(alpha=0.3, color='lightgrey') +
+geom_boxplot(outlier.color=NA, color='steelblue')+labs(x='propertylandusetypeid', title='Distribution of absolute log error by propertylandusetypeid')
+
   
-dtrain[,`:=`(poolcnt=ifelse(is.na(poolcnt),0,poolcnt),pooltypeid10=ifelse(is.na(pooltypeid10),0,pooltypeid10),pooltypeid2=ifelse(is.na(pooltypeid2),0,pooltypeid2),pooltypeid7=ifelse(is.na(pooltypeid7),0,pooltypeid7))]
+zip_error=dtrain[, list(n=.N, mean_error=mean(logerror), st_dev_error=sd(logerror)), by='regionidzip']
+#96951 96207 96323 97331 error huge
+  
+```
 
+```{r echo=FALSE,message=FALSE,warning=FALSE,results='hide'}
 dtrain[,abs_logerror:=abs(logerror)]
+```
 
+I group the features into 3 groups: features related to house physical features(house_features), features related to tax (tax_features),and features related to geo-location (geo_features). I made some correlation plots to examine each feature's correlation with log error and absolute log error within each group.
 
-house_features=c("airconditioningtypeid","architecturalstyletypeid",'basementsqft','bathroomcnt','bedroomcnt','buildingqualitytypeid','buildingclasstypeid','calculatedbathnbr','decktypeid','threequarterbathnbr','finishedfloor1squarefeet','calculatedfinishedsquarefeet','finishedsquarefeet6','finishedsquarefeet12','finishedsquarefeet13','finishedsquarefeet15','finishedsquarefeet50','fireplacecnt','fireplaceflag','fullbathcnt','garagecarcnt','garagetotalsqft','hashottuborspa','heatingorsystemtypeid','lotsizesquarefeet','numberofstories','poolcnt','poolsizesum','pooltypeid10','pooltypeid2','pooltypeid7','roomcnt','storytypeid','typeconstructiontypeid','unitcnt','yardbuildingsqft17','yardbuildingsqft26','yearbuilt',"logerror","abs_logerror")
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+
+house_features=c("airconditioningtypeid","architecturalstyletypeid",'basementsqft','bathroomcnt','bedroomcnt','calculatedbathnbr','threequarterbathnbr','finishedfloor1squarefeet','calculatedfinishedsquarefeet','finishedsquarefeet6','finishedsquarefeet12','finishedsquarefeet13','finishedsquarefeet15','finishedsquarefeet50','fireplacecnt','fireplaceflag','fullbathcnt','garagecarcnt','garagetotalsqft','hashottuborspa','heatingorsystemtypeid','lotsizesquarefeet','numberofstories','poolcnt','poolsizesum','pooltypeid10','pooltypeid2','pooltypeid7','roomcnt','typeconstructiontypeid','unitcnt','yardbuildingsqft17','yardbuildingsqft26','yearbuilt',"logerror","abs_logerror")
 geo_features=c('latitude','longitude','regionidcounty','regionidcity','regionidzip','regionidneighborhood',"logerror","abs_logerror")
   tax_features=c('taxvaluedollarcnt','structuretaxvaluedollarcnt','landtaxvaluedollarcnt','taxamount','assessmentyear','taxdelinquencyflag','taxdelinquencyyear',"logerror","abs_logerror")
   corrplot(cor(dtrain[, ..house_features], use='pairwise.complete.obs'), type='lower')
   corrplot(cor(dtrain[, ..geo_features], use='pairwise.complete.obs'), type='lower')
   corrplot(cor(dtrain[, ..tax_features], use='pairwise.complete.obs'), type='lower')
 
- ```
+```
+
+No feature seems to have strong correlation with either log error or absolute log error 
