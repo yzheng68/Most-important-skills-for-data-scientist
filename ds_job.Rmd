@@ -7,65 +7,69 @@ output: html_document
 ###indeed
 library(rvest)
 library(stringr)
-
+library(dplyr)
+library(tidyr)
 base <- 'https://www.indeed.com'
 url <- "https://www.indeed.com/jobs?as_and=Data+Scientist&as_phr=&as_any=&as_not=&as_ttl=&as_cmp=&jt=all&st=&salary=&radius=25&fromage=any&limit=50&sort=&psf=advsrch"
 indeed=read_html(url)
 page.links <- indeed %>%
   html_nodes(xpath = '//div[contains(@class,"pagination")]//a') %>%
   html_attr('href')
-html=paste0("https://www.indeed.com",indeed %>%html_nodes("h2 a") %>%html_attr('href'))
+indeed_results=html_nodes(indeed,".result")
 
-results=html_nodes(indeed,".result")
-results_tmp=strsplit(html_text(results),"\n\n")
-results=data.frame(
-  title=unlist(lapply(results_tmp, function(x) x[2])),
-  company=gsub("\n","",unlist(lapply(results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
-  experience=unlist(lapply(results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
+html_tmp=lapply(indeed_results,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
+
+indeed_results_tmp=strsplit(html_text(indeed_results),"\n\n")
+indeed_results=data.frame(
+  title=unlist(lapply(indeed_results_tmp, function(x) x[2])),
+  company=gsub("\n","",unlist(lapply(indeed_results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
+  experience=unlist(lapply(indeed_results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
   ,location_tmp=html_nodes(indeed,".location , #p_68d09e88c4ff1c52 .location span")%>%html_text()
 )
-
+indeed_results$html=html
 for(p in 1:length(page.links)-1){
   
   cat('Moving to Next 50 jobs\n')
   
   # Navigate to next page
   new.page <- read_html(paste0(base, page.links[p]))
-  results_tmp=html_nodes(new.page,".result")
-  results_tmp=strsplit(html_text(results_tmp),"\n\n")
-  html_tmp=paste0("https://www.indeed.com", new.page%>%html_nodes("h2 a") %>%html_attr('href'))
-  
-  results_tmp_df=data.frame(
-    title=unlist(lapply(results_tmp, function(x) x[2])),
-    company=gsub("\n","",unlist(lapply(results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
-    experience=unlist(lapply(results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
-    ,location_tmp=html_nodes(new.page,".location , #p_68d09e88c4ff1c52 .location span")%>%html_text()
+  indeed_results_tmp=html_nodes(new.page,".result")
+  html_tmp=lapply(indeed_results_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
+  indeed_results_tmp=strsplit(html_text(indeed_results_tmp),"\n\n")
+
+  indeed_results_tmp_df=data.frame(
+    title=unlist(lapply(indeed_results_tmp, function(x) x[2])),
+    company=gsub("\n","",unlist(lapply(indeed_results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
+    experience=unlist(lapply(indeed_results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
+    ,location_tmp=html_nodes(new.page,".location , #p_68d09e88c4ff1c52 .location span")%>%html_text(),
+    html=html
   )
-results=rbind(results,results_tmp_df)
-html=c(html,html_tmp)
+indeed_results=rbind(indeed_results,indeed_results_tmp_df)
 Sys.sleep(2)
 }
 
+indeed_results=filter(indeed_results,html!="No html")
+indeed_results=indeed_results[!duplicated(indeed_results),]
 
-html=unique(html)
-results=results[!duplicated(results),]
 
+indeed_results$location=gsub("\\(.+|[0-9]","",as.character(indeed_results$location_tmp))
+indeed_results=indeed_results[,-4]
 
-results$location=gsub("\\(.+|[0-9]","",as.character(results$location_tmp))
-results=results[,-4]
+desc=list()
+for(i in 1:length(indeed_results$html)){
+    cat("Moving to",i,"job\n")
 
-results1=list()
-for(i in 1:length(html)){
-  results1[i]=tryCatch({read_html(html[i])%>%html_text()},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  tmp=tryCatch({read_html(indeed_results$html[i])%>%html_text()},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  desc[i]=ifelse(length(tmp)==0,NA,tmp)
   Sys.sleep(2)
 }
 
-####need to clean results1 
-results1=results1[!unlist(lapply(results1,function(x) length(x)==0))]
-tmp=sapply(results1,function(x) tryCatch({str_split(x,"\n")[[1]][1]},error=function(e){cat(conditionMessage(e),"\n")}))
-results2=sapply(results1, function(x) str_replace_all(x, "[^[:alnum:]]", " "))
-results2_title=str_extract(x,str_replace_all(results$title, "[^[:alnum:]]", " "))
 
+indeed_results$desc=unlist(desc)
+indeed_results=filter(indeed_results,!is.na(desc))
+write.csv(indeed_results,file="indeed_results1.csv")
 
 
 
@@ -128,7 +132,6 @@ ds_full$qualification=unlist(qualification)
 ds_full$company
 write.csv(ds_full,file="data_science.csv")
 
-
 ##merck
 url="https://jobs.msd.com/search/?q=data+science&q2=&title=&location=US&date="
 base="https://jobs.msd.com"
@@ -159,9 +162,12 @@ for(i in 1:length(merck_results$html)){
   desc[i]=tryCatch({read_html(as.character(merck_results$html[i]))%>%html_nodes(".job")%>%html_text()},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   Sys.sleep(2)
 }
+
+
 ind=1:dim(merck)[1]
 set.seed(123)
 merck_results=merck_results[sample(ind,15),]
+write.csv(merck_results,"merck_results.csv")
 
 ###sanofi
 url="https://jobs.sanofi.us/search-jobs/data%20science/507-18104/1"
@@ -180,6 +186,9 @@ for(i in 1:length(sanofi_results$html)){
   desc[i]=tryCatch({read_html(as.character(sanofi_results$html[i]))%>%html_nodes(".ats-description")%>%html_text()},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
   Sys.sleep(2)
 }
+
+write.csv(sanofi_results,"sanofi_results.csv")
+
 ###roche
 url="https://www.roche.com/careers/jobs/jobsearch.htm?limit=50&keywords=data%20science&countryCodes=US&jobTypeCodes=STANDARD&offset=3"
 base="https://www.roche.com"
