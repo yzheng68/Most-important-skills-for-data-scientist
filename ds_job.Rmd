@@ -11,6 +11,7 @@ library(dplyr)
 library(tidyr)
 base <- 'https://www.indeed.com'
 url <- "https://www.indeed.com/jobs?as_and=Data+Scientist&as_phr=&as_any=&as_not=&as_ttl=&as_cmp=&jt=all&st=&salary=&radius=25&fromage=any&limit=50&sort=&psf=advsrch"
+
 indeed=read_html(url)
 page.links <- indeed %>%
   html_nodes(xpath = '//div[contains(@class,"pagination")]//a') %>%
