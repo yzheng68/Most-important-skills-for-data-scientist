@@ -9,6 +9,7 @@ library(stringr)
 library(rebus)
 library(ggplot2)
 ###combine all the datasets
+setwd("./data")
 indeed=read.csv("indeed_results1.csv")[,-1]
 
 stack=read.csv("data_science.csv")[,-1]
