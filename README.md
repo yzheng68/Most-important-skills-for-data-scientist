@@ -11,10 +11,11 @@ Stackoverflow: Stackoverflow is a job board targeted for developers.Therefore, u
 
 Merck;Sanofi;Roche webpage: Since I notice that Indeed and Stackoverflow have fewer listings from pharmaceutical companies, this may result in an undersample of data science jobs from the pharmaceutical industry. Therefore, I specifically scrape the data science related jobs from the webpages of Merck, Sanofi, and Roche, which are three of the top pharmaceutical companies worldwide. I scrape 15 data science related jobs from each company. 
 
-#Data processing
+# Data Processing 
 
-
-
-# Exploratory Analysis
+I compile all the scraped data into a large dataset named full_dat. After removing 19 duplicated jobs I have 1202 job listings in total. In order to extract job skills required for each job, I remove all the special character and convert all the capitalized words into lower-case words in the job scriptions I scraped from each individual job link. Then I create a list of job skills that are most commonly used in Data Scientist Job, including hadoop, python, sql, r, spar,sas,aws,excel,azure,java,tableau, deep learning, machine learning, AI,statistics,pandas, scipy, c++,perl,text mining, matlab, xml,hive,splunk,database,modeling, data mining, time series, jupyter, shell, unix, linex, API, cloud, apache, and swift. Then I used str_detect from stringr package to find a pattern match in each job description, I counted each skill once if a match is found. By doing this iterating over all jobs, I obtained a total count of each skill among all jobs.The following barplot shows the counts for each skill in descending order. It appears that R is the most common skills that employers need for data science related jobs, following by Java, C++, xml, and python. 
 
 [![Rplot.png](https://s1.postimg.org/1eaibaq5fz/Rplot.png)](https://postimg.org/image/4g6ecirhmz/)
+
+Then I break down the skill counts by industry. To extract industry information, I ...
+
