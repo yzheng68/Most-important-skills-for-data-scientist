@@ -17,4 +17,4 @@ Merck;Sanofi;Roche webpage: Since I notice that Indeed and Stackoverflow have fe
 
 # Exploratory Analysis
 
-![](https://raw.github.com/{yzheng68}/{newproject}/{master}/{data/Rplot.png})
+[![Rplot.png](https://s1.postimg.org/1eaibaq5fz/Rplot.png)](https://postimg.org/image/4g6ecirhmz/)
