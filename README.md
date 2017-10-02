@@ -13,3 +13,8 @@ Merck;Sanofi;Roche webpage: Since I notice that Indeed and Stackoverflow have fe
 
 #Data processing
 
+
+
+# Exploratory Analysis
+
+![](https://raw.github.com/{yzheng68}/{newproject}/{data/Rplot.png})
