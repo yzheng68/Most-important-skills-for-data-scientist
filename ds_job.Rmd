@@ -4,75 +4,96 @@ output: html_document
 ---
 
 ```{r}
-###indeed
+###careerbuilder
 library(rvest)
 library(stringr)
 library(dplyr)
 library(tidyr)
-base <- 'https://www.indeed.com'
-url <- "https://www.indeed.com/jobs?as_and=Data+Scientist&as_phr=&as_any=&as_not=&as_ttl=&as_cmp=&jt=all&st=&salary=&radius=25&fromage=any&limit=50&sort=&psf=advsrch"
+base="https://www.careerbuilder.com"
+url="https://www.careerbuilder.com/jobs-data-science"
 
-indeed=read_html(url)
-page.links <- indeed %>%
-  html_nodes(xpath = '//div[contains(@class,"pagination")]//a') %>%
-  html_attr('href')
-indeed_results=html_nodes(indeed,".result")
-
-html_tmp=lapply(indeed_results,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
-html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
-
-indeed_results_tmp=strsplit(html_text(indeed_results),"\n\n")
-indeed_results=data.frame(
-  title=unlist(lapply(indeed_results_tmp, function(x) x[2])),
-  company=gsub("\n","",unlist(lapply(indeed_results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
-  experience=unlist(lapply(indeed_results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
-  ,location_tmp=html_nodes(indeed,".location , #p_68d09e88c4ff1c52 .location span")%>%html_text()
-)
-indeed_results$html=html
-for(p in 1:length(page.links)-1){
+careerbuilder_results1=data.frame(title="",company="",location="",html="")
+for(i in 1:7){
   
-  cat('Moving to Next 50 jobs\n')
+  cat('Moving to Next 25 jobs\n')
   
   # Navigate to next page
-  new.page <- read_html(paste0(base, page.links[p]))
-  indeed_results_tmp=html_nodes(new.page,".result")
-  html_tmp=lapply(indeed_results_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+  new.page <- read_html(paste0(url,"?page_number=",i))
+  careerbuilder_results1_tmp=html_nodes(new.page,".job-row")
+  html_tmp=lapply(careerbuilder_results1_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
 html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
-  indeed_results_tmp=strsplit(html_text(indeed_results_tmp),"\n\n")
-
-  indeed_results_tmp_df=data.frame(
-    title=unlist(lapply(indeed_results_tmp, function(x) x[2])),
-    company=gsub("\n","",unlist(lapply(indeed_results_tmp, function(x) ifelse(x[3]=="",x[4],x[3])))),
-    experience=unlist(lapply(indeed_results_tmp, function(x) ifelse(sum(startsWith(x,"Desired Experience:"))==0,ifelse(sum(startsWith(x,"Experience"))==0,NA,x[startsWith(x,"Experience")]),x[startsWith(x,"Desired Experience:")])))
-    ,location_tmp=html_nodes(new.page,".location , #p_68d09e88c4ff1c52 .location span")%>%html_text(),
+  careerbuilder_results1_tmp=sapply(strsplit(html_text(careerbuilder_results1_tmp),"\n\n"),function(x) unlist(x)[unlist(x)!=""])
+careerbuilder_results1_tmp=sapply(careerbuilder_results1_tmp, function(x) unlist(x)[!unlist(x)%in%c("\nCAREERBUILDER APPLY","\nADVERTISEMENT")])
+  careerbuilder_results1_tmp_df=data.frame(
+    title=gsub("\n","",unlist(lapply(careerbuilder_results1_tmp, function(x) x[2]))),
+    company=gsub("\n","",unlist(lapply(careerbuilder_results1_tmp, function(x) x[7]))),
+    location=gsub("\n","",unlist(lapply(careerbuilder_results1_tmp, function(x) ifelse(grepl(".+, [A-Z]{2}$",x[7]),x[7],ifelse(grepl(".+, [A-Z]{2}$",x[8]),x[8],x[9]))))),
     html=html
   )
-indeed_results=rbind(indeed_results,indeed_results_tmp_df)
+careerbuilder_results1=rbind(careerbuilder_results1,careerbuilder_results1_tmp_df)
 Sys.sleep(2)
 }
+careerbuilder_results1=careerbuilder_results1[-1,]
 
-indeed_results=filter(indeed_results,html!="No html")
-indeed_results=indeed_results[!duplicated(indeed_results),]
-
-
-indeed_results$location=gsub("\\(.+|[0-9]","",as.character(indeed_results$location_tmp))
-indeed_results=indeed_results[,-4]
-
+label=list()
 desc=list()
-for(i in 1:length(indeed_results$html)){
+for(i in 1:length(careerbuilder_results1$html)){
     cat("Moving to",i,"job\n")
 
-  tmp=tryCatch({read_html(indeed_results$html[i])%>%html_text()},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
-  desc[i]=ifelse(length(tmp)==0,NA,tmp)
-  Sys.sleep(2)
+  tmp=tryCatch({read_html(as.character(careerbuilder_results1$html[i]))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  label[i]=tmp%>%html_nodes(".small-12+ .row .columns")%>%html_text()
+  #label[i]=unlist(strsplit(label,"\n"))[unlist(strsplit(label,"\n"))!=""]
+  desc[i]=paste(tmp%>%html_nodes(".description")%>%html_text(),collapse = "\n")
+  Sys.sleep(1)
+}
+
+careerbuilder_results1$label=unlist(label)
+careerbuilder_results1$desc=unlist(desc)
+
+url="https://www.careerbuilder.com/jobs-data"
+careerbuilder_results=data.frame(title="",company="",location="",html="")
+for(i in 1:12){
+  
+  cat('Moving to Next 25 jobs\n')
+  
+  # Navigate to next page
+  new.page <- read_html(paste0(url,"?page_number=",i))
+  careerbuilder_results_tmp=html_nodes(new.page,".job-row")
+  html_tmp=lapply(careerbuilder_results_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
+  careerbuilder_results_tmp=sapply(strsplit(html_text(careerbuilder_results_tmp),"\n\n"),function(x) unlist(x)[unlist(x)!=""])
+careerbuilder_results_tmp=sapply(careerbuilder_results_tmp, function(x) unlist(x)[!unlist(x)%in%c("\nCAREERBUILDER APPLY","\nADVERTISEMENT")])
+  careerbuilder_results_tmp_df=data.frame(
+    title=gsub("\n","",unlist(lapply(careerbuilder_results_tmp, function(x) x[2]))),
+    company=gsub("\n","",unlist(lapply(careerbuilder_results_tmp, function(x) x[7]))),
+    location=gsub("\n","",unlist(lapply(careerbuilder_results_tmp, function(x) ifelse(grepl(".+, [A-Z]{2}$",x[7]),x[7],ifelse(grepl(".+, [A-Z]{2}, [A-Z]{3}$",x[8]),x[8],x[9]))))),
+    html=html
+  )
+careerbuilder_results=rbind(careerbuilder_results,careerbuilder_results_tmp_df)
+Sys.sleep(2)
+}
+careerbuilder_results=careerbuilder_results[-1,]
+
+label=list()
+desc=list()
+for(i in 1:length(careerbuilder_results$html)){
+    cat("Moving to",i,"job\n")
+
+  tmp=tryCatch({read_html(as.character(careerbuilder_results$html[i]))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  label[i]=tmp%>%html_nodes(".small-12+ .row .columns")%>%html_text()
+  #label[i]=unlist(strsplit(label,"\n"))[unlist(strsplit(label,"\n"))!=""]
+  desc[i]=paste(tmp%>%html_nodes(".description")%>%html_text(),collapse = "\n")
+  Sys.sleep(1)
 }
 
 
-indeed_results$desc=unlist(desc)
-indeed_results=filter(indeed_results,!is.na(desc))
-write.csv(indeed_results,file="indeed_results1.csv")
+careerbuilder_results$label=unlist(label)
+careerbuilder_results$desc=unlist(desc)
 
+careerbuilder_all=rbind(careerbuilder_results1,careerbuilder_results)
+careerbuilder_all=careerbuilder_all[!duplicated(careerbuilder_all),]
 
+write.csv(careerbuilder_all,"careerbuilder_all.csv")
 
 ###stack_overflow
 ds=data.frame(title="",company="",location="",experience="",html="")

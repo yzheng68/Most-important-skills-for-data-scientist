@@ -1,0 +1,158 @@
+---
+title: "ds_eda"
+output: html_document
+---
+
+```{r}
+library(dplyr)
+library(stringr)
+library(rebus)
+library(ggplot2)
+
+setwd("/Users/yeyazheng/Desktop/651/newproject/data")
+careerbuilder=read.csv("careerbuilder_all.csv")[,-c(1:2)]
+label=sapply(str_split(careerbuilder$label,"\n"),function(x) unlist(x)[unlist(x)!=""])
+#careerbuilder$job_type=unlist(sapply(label,function(x) x[2]))
+careerbuilder$industry=unlist(sapply(label,function(x) ifelse(!x[length(x)]%in%c("Relocation - No","Other","Science","Relocation - Yes"),x[length(x)],ifelse(x[length(x)-1]=="Other",x[length(x)-2],x[length(x)-1]))))
+#careerbuilder$keyword=c(rep(0,175),rep(1,300))
+
+stack=read.csv("data_science.csv")[,-1]
+#stack$keyword=c(rep(0,167),rep(1,156))
+full_dat=data.frame(title=c(as.character(careerbuilder$title),as.character(stack$title)),company=c(as.character(careerbuilder$company),as.character(stack$company)),location=c(as.character(careerbuilder$location),as.character(stack$location)),desc=c(as.character(careerbuilder$desc),as.character(stack$desc)),industry=c(as.character(careerbuilder$industry),as.character(stack$industry)),ind=c(rep(0,dim(careerbuilder)[1]),rep(1,dim(stack)[1])),keyword=c(careerbuilder$keyword,stack$keyword))
+
+full_dat=full_dat[!duplicated(full_dat),]
+###clean industry
+industry1=sapply(full_dat$industry,function(x) tolower(str_trim(str_replace_all(x, "[^[:alnum:]]", " "))))
+
+industry_clean=ifelse(str_detect(industry1,or("education","academia","academic","research")),'Education',ifelse(str_detect(industry1,or('health','health'%R%optional(one_or_more(SPC))%R%'care','biotech.+',"lifescience","pharm.+")),'Health Care',ifelse(str_detect(industry1,or('finan.+','insurance','bank.+','capital','b2b','business',"trade.+","investments","accounting")),'Finance',ifelse(str_detect(industry1,'telecommunication'),'Telecommunications',ifelse(str_detect(industry1,'real estate'),'Real Estate',ifelse(str_detect(industry1,'energy'),'Oil, Gas, Energy & Utilities',ifelse(str_detect(industry1,or('media','entertain.+','gaming','marketing','advertis.+','^ad.+','magazine.+',"market")),'Media',ifelse(str_detect(industry1,or('consulting',"management","consultant","human resource","customer","staffing")),'Business Services',ifelse(str_detect(industry1,or('commerc.+',"retail","sales","consumer")),"Retail",ifelse(str_detect(industry1,or('.+tech','software','cloud','internet','cyber','^it'%R%SPC,'web','saas','speech','computing','artificial intelligence'
+,"fraud")),'Information Technology',ifelse(str_detect(industry1,or("travel","tourism")),"Tourism",ifelse(str_detect(industry1,'defense'),"Aerospace & Defense",ifelse(str_detect(industry1,"agriculture"),"Agriculture & Forestry",ifelse(str_detect(industry1,or("automotive","automobile","construction","engineering","electronics","quality","transportation","manufacturing")),"Manufacturing",ifelse(str_detect(industry1,or("federal","government")),"Government",ifelse(str_detect(industry1,or("nonprofit","social service")),"Non-Profit",industry1))))))))))))))))
+
+full_dat$industry_clean=industry_clean
+#full_dat[full_dat$industry_clean%in%c("data   analytics","data analysis","installation   maint   repair","partenariat industriel  recherche académique   data science","product development","science","science  entry level"),"company"]
+#filter(full_dat[,-4],str_detect(industry_clean,"other"))
+full_dat$industry_clean=ifelse(as.character(full_dat$company)=="Johnson & Johnson","Health Care",ifelse(as.character(full_dat$company)=="ManTech International Corporation","Information Technology",ifelse(as.character(full_dat$company)=="BIG WEDNESDAY DIGITAL","Business Services",ifelse(as.character(full_dat$company)=="The Judge Group","Business Services",ifelse(str_detect(as.character(full_dat$company),"Nesco"),"Business Services",ifelse(as.character(full_dat$company)=="Vencore","Aerospace & Defense",ifelse(as.character(full_dat$company)=="Grainger","Business Services",ifelse(as.character(full_dat$company)=="General Motors","Manufacturing",ifelse(as.character(full_dat$company)=="Terumo BCT","Health Care",ifelse(as.character(full_dat$company)=="Apex Systems","Business Services",ifelse(as.character(full_dat$company)=="Progrexion Holdings Inc","Business Services",ifelse(as.character(full_dat$company)=="SCOM","Business Services",ifelse(as.character(full_dat$company)=="Unisys Corporation","Information Technology",ifelse(as.character(full_dat$company)=="Deloitte","Finance",ifelse(as.character(full_dat$company)=="Genpact","Information Technology",ifelse(as.character(full_dat$company)=="Genpact","Information Technology",ifelse(as.character(full_dat$company)=="Apex Life Sciences","Business Services",ifelse(as.character(full_dat$company)=="ADP - Automatic Data Processing","Business Services",ifelse(as.character(full_dat$company)=="THE RIGHT STAFF LLC","Business Services",ifelse(as.character(full_dat$company)=="First Midwest Bank","Finance",
+ ifelse(as.character(full_dat$company)=="Web.com","Information Technology",
+ ifelse(as.character(full_dat$company)=="Advance Auto Parts","Retail",ifelse(as.character(full_dat$company)=="ProClinical","Business Services",
+ ifelse(as.character(full_dat$company)=="The Select Group","Information Technology",
+ifelse(str_detect(as.character(full_dat$company),"Ecole"),"Government",
+ ifelse(str_detect(as.character(full_dat$company),"comScore"),"Business Services",ifelse(as.character(full_dat$company)=="Simbex","Health Care",
+                                                       ifelse(str_detect(as.character(full_dat$company),"EXASOL"),"Information Technology",                                  full_dat$industry_clean))))))))))))))))))))))))))))
+
+full_dat=filter(full_dat,!industry_clean%in%c("other great industries","no industry listed","location based services"))
+merck=read.csv("merck_results.csv")[,-1]
+roche=read.csv("roche_results.csv")[,-1]
+sanofi=read.csv("sanofi_results.csv")[,-1]
+ind=1:dim(merck)[1]
+set.seed(123)
+merck=merck[sample(ind,15),]
+colnames(merck)
+
+pharm=data.frame(title=c(as.character(merck$title),as.character(sanofi$title),as.character(roche$title)),company=c(rep("merck",15),rep("sanofi",15),rep("roche",15)),location=c(as.character(merck$location),as.character(sanofi$location),rep(NA,15)),desc=c(as.character(merck$desc),as.character(sanofi$desc),as.character(roche$desc)),ind=rep(2,45),industry_clean=rep("Health Care",45))
+full_dat=rbind(full_dat[,-5],pharm)
+
+
+write.csv(full_dat,"full_dat.csv")
+```
+
+```{r}
+desc1=sapply(as.character(paste(full_dat$desc)),function(x) tolower(str_trim(str_replace_all(x, "[^[:alnum:]]", " "))))
+
+skills=data.frame(hadoop=as.numeric(str_detect(desc1,pattern = "hadoop")),
+           python=as.numeric(str_detect(desc1,pattern = "python")),
+           sql=as.numeric(str_detect(desc1,pattern =or("mysql","nosql","sql"))),
+           r=as.numeric(str_detect(desc1,pattern = SPC%R%'r'%R%SPC)),
+          spark=as.numeric(str_detect(desc1,pattern = "spark")),
+          sas=as.numeric(str_detect(desc1,pattern =SPC%R%'sas'%R%SPC )),
+          aws=as.numeric(str_detect(desc1,pattern =or("amazon"%R%optional(one_or_more(SPC))%R%"web"%R%optional(one_or_more(SPC))%R%"service","aws"))),
+          excel=as.numeric(str_detect(desc1,pattern = "excel")),
+          azure=as.numeric(str_detect(desc1,pattern = "azure")),
+          java=as.numeric(str_detect(desc1,pattern =or('java',"javascript"))),
+          tableau=as.numeric(str_detect(desc1,pattern ='tableau')),
+          deep_learning=as.numeric(str_detect(desc1,pattern ="deep"%R%optional(one_or_more(SPC))%R%"learning")),
+machine_learning=as.numeric(str_detect(desc1,pattern ="machine"%R%optional(one_or_more(SPC))%R%"learning")),
+ai=as.numeric(str_detect(desc1,pattern =or("artificial"%R%optional(one_or_more(SPC))%R%"intelligence",SPC%R%"ai"%R%SPC))),
+      stat=  as.numeric(str_detect(desc1,pattern ="statistics")),
+      pandas=as.numeric(str_detect(desc1,pattern ="pandas")),
+      scipy=as.numeric(str_detect(desc1,pattern ="scipy")),
+      perl=as.numeric(str_detect(desc1,pattern ="perl")),
+      text_mining=as.numeric(str_detect(desc1,pattern ="text"%R%optional(one_or_more(SPC))%R%"mining")),
+      matlab=as.numeric(str_detect(desc1,pattern ="matlab")),
+      c=as.numeric(str_detect(desc1,pattern =SPC%R%"c"%R%SPC)),
+        hive=as.numeric(str_detect(desc1,pattern ="hive")),
+      splunk=as.numeric(str_detect(desc1,pattern ="splunk")),
+            database=as.numeric(str_detect(desc1,pattern ="database")),
+            modeling=as.numeric(str_detect(desc1,pattern ="modeling")),
+      
+data_mining=as.numeric(str_detect(desc1,pattern ="data"%R%optional(one_or_more(SPC))%R%"mining")),
+time_series=as.numeric(str_detect(desc1,pattern ="time"%R%optional(one_or_more(SPC))%R%"series")),
+jupyter=as.numeric(str_detect(desc1,pattern ="jupyter")),
+shell=as.numeric(str_detect(desc1,pattern ="shell")),
+unix=as.numeric(str_detect(desc1,pattern ="unix")),
+linux=as.numeric(str_detect(desc1,pattern ="linux")),
+cloud=as.numeric(str_detect(desc1,pattern ="cloud")),
+apache=as.numeric(str_detect(desc1,pattern ="apache")),
+swift=as.numeric(str_detect(desc1,pattern ="swift"))
+)
+full_dat=cbind(full_dat,skills)
+
+ct=as.numeric(apply(skills, 2, function(x) sum(x,na.rm = T)))
+skills1=data.frame(skill=colnames(skills),ct=ct)
+
+p <- ggplot(skills1, aes(reorder(skill,-ct), ct)) + geom_bar(stat="identity") + 
+  labs(x = 'Skill', y = 'Count', title ='Skill Counts ')
+p+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+prop1=as.numeric(apply(full_dat[full_dat$ind==0,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==0,])[1]))
+skills_careerbuilder=data.frame(skill=colnames(skills),prop1=prop1)
+
+p1 <- ggplot(skills_careerbuilder, aes(reorder(skill,-prop1), prop1)) + geom_bar(stat="identity") + 
+  labs(x = 'Skill', y = 'Prop', title ='Indeed Skill Proportion ')
+p1+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+
+prop2=as.numeric(apply(full_dat[full_dat$ind==1,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==1,])[1]))
+skills_stackoverflow=data.frame(skill=colnames(skills),prop2=prop2)
+
+p2 <- ggplot(skills_stackoverflow, aes(reorder(skill,-prop2), prop2)) + geom_bar(stat="identity") + 
+  labs(x = 'Skill', y = 'Prop', title ='Stackoverflow Skill Proportion ')
+p2+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+
+prop3=as.numeric(apply(full_dat[full_dat$ind==2,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==2,])[1]))
+skills_pharm=data.frame(skill=colnames(skills),prop3=prop3)
+
+p3 <- ggplot(skills_pharm, aes(reorder(skill,-prop3), prop3)) + geom_bar(stat="identity") + 
+  labs(x = 'Skill', y = 'Prop', title ='Pharmaceutical Companies Skill Proportion ')
+p3+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+
+edu=data.frame(master=as.numeric(str_detect(desc1,pattern = or("master","masters",SPC%R%'ms'%R%SPC))),
+           phd=as.numeric(str_detect(desc1,pattern = or(SPC%R%'phd'%R%SPC,"doctor","doctoral"))),
+           undergrad=as.numeric(str_detect(desc1,pattern =or("bachelor","bachelors","undergrad","undergraduate"))))
+edu$highest_edu=ifelse(edu$phd==1,"phd",ifelse(edu$master==1,"ms","bachelor"))
+
+full_dat$highest_edu=edu$highest_edu
+table(full_dat$highest_edu)
+
+#by industry
+skills_by_industry=as.data.frame(full_dat[,6:40]%>%group_by(industry_clean)%>%summarise_each(funs(mean(., na.rm=TRUE))))
+tmp=cbind(as.character(skills1$skill),as.data.frame(t(skills_by_industry[,-1])))
+colnames(tmp)=c("skill",skills_by_industry$industry_clean)
+skills_by_industry=gather(tmp,industry,value,-skill)
+
+ggplot(skills_by_industry, aes(reorder(skill,-value), value,group="industry")) + geom_bar(stat="identity") +facet_wrap(~industry)+labs(x = 'Skill', y = 'Prop', title ="Skills by Industry")+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+
+#by industry
+edu_industry=as.data.frame(full_dat[,c("highest_edu","industry_clean")]%>%group_by(industry_clean)%>%summarise(bachelor.ct=sum(highest_edu=="bachelor"),ms.ct=sum(highest_edu=="ms"),phd.ct=sum(highest_edu=="phd")))
+
+chisq.test(x=filter(edu_industry,industry_clean%in%c("Finance","Health Care","Information Technology"))[,-1])
+tmp=cbind(colnames(edu_industry[,-1]),as.data.frame(t(edu_industry[,-1])))
+colnames(tmp)=c("highest_edu",edu_industry$industry_clean)
+edu_by_industry=gather(tmp,industry,value,-highest_edu)
+
+ggplot(edu_by_industry, aes(highest_edu, value,group="industry")) + geom_bar(stat="identity") +facet_wrap(~industry)+labs(x = 'Skill', y = 'Prop', title ="Education by Industry")+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
+
+```
+
