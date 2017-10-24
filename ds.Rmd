@@ -36,7 +36,7 @@ I firstly compiled the scraped data from CareerBuilder and StackOverflow into on
 I did some text manipulation to group similar industry categories together. I firstly removed all the special characters in industry categories and converted them into lower cases. Then I used str_detect to detect keywords in industry category listings.  If there are 'care','biotech',"lifescience","pharm" detected in the category listings, then they are reassigned the "Health Care" as their industry category listing; if there are "education","academia","academic","research" detected in the category listings, then they are reassigned the "Education" as the industry category listing; if there are 'tech','software','cloud','internet','cyber','it','web','saas','speech','computing','artificial intelligence'
 ,"fraud" detected, then they are reassigned the "Information Technology" as the industry category listing...  There are more than 40 companies having industry category listed as "Other Great Industries ", "Data Analysis", "Science", which provided little information in grouping them into the right industry category. For those companies, I manually checked them one-by-one and input their industry categories. However, in the end, there are still some companies with missing industry categories, due to time limitation, I removed those job listings from future analysis. After grouping, there are 16 industry categories, including Business Services,  Health Care, Retail,Finance,Information Technology,Manufacturing,  Education,Aerospace & Defense,Oil, Gas, Energy & Utilities, Media Telecommunications,Tourism,Non-Profit,Government,Agriculture & Forestry, and Real Estate. After removing job listings with missing industry information, the duplicated ones, and appending the job listings from Merck, Sanofi, and Roche, I have 783 jobs in total. 
 
-Then I extracted job skills required for each job. In order to do that, I removed all the special character and converted all the capitalized words into lower-case ones in the job scriptions I scraped from each individual job link. Then I created a list of job skills that are most commonly used in Data Scientist Job, including hadoop, python, sql, r, spar,sas,aws,excel,azure,java,tableau, deep learning, machine learning, AI,statistics,pandas, scipy, c,perl,text mining, matlab,hive,splunk,database,modeling, data mining, time series, jupyter, shell, unix, linex, cloud, apache, and swift. Then I used str_detect from stringr package to find a pattern match in each job description, I counted each skill once if a match is found. By doing this iterating over all jobs, I obtained a total count of each skill among all jobs.The following barplot shows the counts for each skill in descending order for all the job listings. Surprisingly, SQL turns out to be the skill with most counts, following by excel, database, python, java, and so on. 
+Then I extracted job skills required for each job. In order to do that, I created a list of job skills that are most commonly used in Data Scientist Job, including hadoop, python, sql, r, spark,sas,aws,excel,azure,java,tableau, deep learning, machine learning, AI,pandas, scipy, c,perl,text mining, matlab,hive,splunk, data mining, time series, jupyter, shell, unix/linex, cloud, apache, and swift. Then I used grepl to find a pattern match in each job description, I counted each skill once if a match is found. By doing this iterating over all jobs, I obtained a total count of each skill among all jobs.The following barplot shows the counts for each skill in descending order for all the job listings. Surprisingly, SQL turns out to be the skill with most counts, following by pyhon, java, machine learning, R, and so on. 
 
 ```{r echo=FALSE,message=FALSE,warning=FALSE}
 library(dplyr)
@@ -46,44 +46,39 @@ library(ggplot2)
 library(tidyr)
 setwd("./data")
 full_dat=read.csv("full_dat.csv")[-1]
+#desc1=sapply(as.character(paste(full_dat$desc)),function(x) tolower(str_trim(str_replace_all(x, "[^[:alnum:]]", " "))))
 
-desc1=sapply(as.character(paste(full_dat$desc)),function(x) tolower(str_trim(str_replace_all(x, "[^[:alnum:]]", " "))))
-
-skills=data.frame(hadoop=as.numeric(str_detect(desc1,pattern = "hadoop")),
-           python=as.numeric(str_detect(desc1,pattern = "python")),
-           sql=as.numeric(str_detect(desc1,pattern =or("mysql","nosql","sql"))),
-           r=as.numeric(str_detect(desc1,pattern = SPC%R%'r'%R%SPC)),
-          spark=as.numeric(str_detect(desc1,pattern = "spark")),
-          sas=as.numeric(str_detect(desc1,pattern =SPC%R%'sas'%R%SPC )),
-          aws=as.numeric(str_detect(desc1,pattern =or("amazon"%R%optional(one_or_more(SPC))%R%"web"%R%optional(one_or_more(SPC))%R%"service","aws"))),
-          excel=as.numeric(str_detect(desc1,pattern = "excel")),
-          azure=as.numeric(str_detect(desc1,pattern = "azure")),
-          java=as.numeric(str_detect(desc1,pattern =or('java',"javascript"))),
-          tableau=as.numeric(str_detect(desc1,pattern ='tableau')),
-          deep_learning=as.numeric(str_detect(desc1,pattern ="deep"%R%optional(one_or_more(SPC))%R%"learning")),
-machine_learning=as.numeric(str_detect(desc1,pattern ="machine"%R%optional(one_or_more(SPC))%R%"learning")),
-ai=as.numeric(str_detect(desc1,pattern =or("artificial"%R%optional(one_or_more(SPC))%R%"intelligence",SPC%R%"ai"%R%SPC))),
-      stat=  as.numeric(str_detect(desc1,pattern ="statistics")),
-      pandas=as.numeric(str_detect(desc1,pattern ="pandas")),
-      scipy=as.numeric(str_detect(desc1,pattern ="scipy")),
-      perl=as.numeric(str_detect(desc1,pattern ="perl")),
-      text_mining=as.numeric(str_detect(desc1,pattern ="text"%R%optional(one_or_more(SPC))%R%"mining")),
-      matlab=as.numeric(str_detect(desc1,pattern ="matlab")),
-      c=as.numeric(str_detect(desc1,pattern =SPC%R%"c"%R%SPC)),
-        hive=as.numeric(str_detect(desc1,pattern ="hive")),
-      splunk=as.numeric(str_detect(desc1,pattern ="splunk")),
-            database=as.numeric(str_detect(desc1,pattern ="database")),
-            modeling=as.numeric(str_detect(desc1,pattern ="modeling")),
-      
-data_mining=as.numeric(str_detect(desc1,pattern ="data"%R%optional(one_or_more(SPC))%R%"mining")),
-time_series=as.numeric(str_detect(desc1,pattern ="time"%R%optional(one_or_more(SPC))%R%"series")),
-jupyter=as.numeric(str_detect(desc1,pattern ="jupyter")),
-shell=as.numeric(str_detect(desc1,pattern ="shell")),
-unix=as.numeric(str_detect(desc1,pattern ="unix")),
-linux=as.numeric(str_detect(desc1,pattern ="linux")),
-cloud=as.numeric(str_detect(desc1,pattern ="cloud")),
-apache=as.numeric(str_detect(desc1,pattern ="apache")),
-swift=as.numeric(str_detect(desc1,pattern ="swift"))
+skills=data.frame(hadoop=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sHadoop\\b",x, ignore.case=TRUE)))),
+           python=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sPython\\b",x, ignore.case=TRUE)))),
+           sql=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("\\smysql\\b","\\snosql\\b", "\\ssql\\b"),x, ignore.case=TRUE)))),
+           r=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sR\\b",x, ignore.case=TRUE)))),
+          spark=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sSpark\\b",x, ignore.case=TRUE)))),
+          sas=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sSas\\b",x, ignore.case=TRUE)))),
+          aws=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("amazon"%R%optional(one_or_more(SPC))%R%"web"%R%optional(one_or_more(SPC))%R%"service","\\saws\\b"),x, ignore.case=TRUE)))),
+          excel=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sExcel\\b",x, ignore.case=TRUE)))),
+          azure=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sAzure\\b",x, ignore.case=TRUE)))),
+          java=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("\\sjava\\b","\\sjavascript\\b"),x, ignore.case=TRUE)))),
+          tableau=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sTableau\\b",x, ignore.case=TRUE)))),
+          deep_learning=as.numeric(sapply(full_dat$desc,function(x) any(grepl("deep.learning",x, ignore.case=TRUE)))),
+machine_learning=as.numeric(sapply(full_dat$desc,function(x) any(grepl("machine.learning",x, ignore.case=TRUE)))),
+ai=as.numeric(sapply(full_dat$desc,function(x) any(grepl("artificial.intelligence",x, ignore.case=TRUE)))),
+      pandas=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\spandas\\b",x, ignore.case=TRUE)))),
+      scipy=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sscipy\\b",x, ignore.case=TRUE)))),
+      perl=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sperl\\b",x, ignore.case=TRUE)))),
+      text_mining=as.numeric(sapply(full_dat$desc,function(x) any(grepl("text.mining",x, ignore.case=TRUE)))),
+      matlab=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\smatlab\\b",x, ignore.case=TRUE)))),
+      c=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sC\\b",x, ignore.case=TRUE)))),
+  spss=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sspss\\b",x, ignore.case=TRUE)))),
+        hive=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\shive\\b",x, ignore.case=TRUE)))),
+      splunk=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\ssplunk\\b",x, ignore.case=TRUE)))),
+data_mining=as.numeric(sapply(full_dat$desc,function(x) any(grepl("data.mining",x, ignore.case=TRUE)))),
+time_series=as.numeric(sapply(full_dat$desc,function(x) any(grepl("time.series",x, ignore.case=TRUE)))),
+jupyter=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sjupyter\\b",x, ignore.case=TRUE)))),
+shell=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sshell\\b",x, ignore.case=TRUE)))),
+unix_linux=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or(SPC%R%"unix"%R%SPC,SPC%R%"linux"%R%SPC),x, ignore.case=TRUE)))),
+cloud=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\scloud\\b",x, ignore.case=TRUE)))),
+apache=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sapache\\b",x, ignore.case=TRUE)))),
+swift=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sswift\\b",x, ignore.case=TRUE))))
 )
 full_dat=cbind(full_dat,skills)
 
@@ -96,11 +91,11 @@ p <- ggplot(skills1, aes(reorder(skill,-ct), ct)) + geom_bar(stat="identity") +
 p+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
 ```
 
-The following figures show the skill counts broken down by websites. This time, y axis represents proportion of skill counts, which is computed using counts for a specific skill divided by the total # of job listings from a specific website, in this way, I can adjust for the imbalance in websites' listing volumns. Figure a) shows the skill proportion for jobs listed on CareerBuilder, figure b) shows the skill proportion for jobs listed on StackOverflow, and figure c) shows the skill proportion for jobs listed on pharmaceutical company websites (Merck, Sanofi, and Roche). The skill rankings vary a lot across websites. For CareerBuilder, excel seems to be the skill with most counts, following by database, sql, modeling, statistics, python and R. For StackOverflow, sql seems to be the skill with most counts, following by Java, database, python, excel, amazon web service, and c. For major pharmaceutical websites, excel seems to be the skill with most counts, following by c, spark, database, and r. This makes sense to some extent, since the majority job listings I scraped from CareerBuilder I used keyword "data". Many of them may be entry-level analyst positions which have little technical focus. For StackOverflow, it has more technical jobs for developers, therefore it requires more skills in java and SQL. However, it still looks problematic that R is not listed as the top 3 skills in any of the website. 
+The following figures show the skill counts broken down by websites. This time, y axis represents proportion of skill counts, which is computed using counts for a specific skill divided by the total # of job listings from a specific website, in this way, I can adjust for the imbalance in websites' listing volumns. Figure a) shows the skill proportion for jobs listed on CareerBuilder, figure b) shows the skill proportion for jobs listed on StackOverflow, and figure c) shows the skill proportion for jobs listed on pharmaceutical company websites (Merck, Sanofi, and Roche). The skill rankings vary a lot across websites. For CareerBuilder, sql and excel seems to be the skills with most counts, following by R, python, and machine learning. For StackOverflow, Java seems to be the skill with most counts, following by SQL, Python, and machine learning. For major pharmaceutical websites, spark seems to be the skill with most counts, following by R, Java, and cloud. This makes sense to some extent, since the majority job listings I scraped from CareerBuilder I used keyword "data". Many of them may be entry-level analyst positions which have little technical focus. For StackOverflow, it has more technical jobs for developers, therefore it requires more skills in java. 
 
 
 ```{r echo=FALSE,message=FALSE,warning=FALSE}
-prop1=as.numeric(apply(full_dat[full_dat$ind==0,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==0,])[1]))
+prop1=as.numeric(apply(full_dat[full_dat$ind==0,7:37], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==0,])[1]))
 skills_careerbuilder=data.frame(skill=colnames(skills),prop1=prop1)
 
 p1 <- ggplot(skills_careerbuilder, aes(reorder(skill,-prop1), prop1)) + geom_bar(stat="identity") + 
@@ -108,7 +103,7 @@ p1 <- ggplot(skills_careerbuilder, aes(reorder(skill,-prop1), prop1)) + geom_bar
 p1+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
 
 
-prop2=as.numeric(apply(full_dat[full_dat$ind==1,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==1,])[1]))
+prop2=as.numeric(apply(full_dat[full_dat$ind==1,7:37], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==1,])[1]))
 skills_stackoverflow=data.frame(skill=colnames(skills),prop2=prop2)
 
 p2 <- ggplot(skills_stackoverflow, aes(reorder(skill,-prop2), prop2)) + geom_bar(stat="identity") + 
@@ -116,12 +111,13 @@ p2 <- ggplot(skills_stackoverflow, aes(reorder(skill,-prop2), prop2)) + geom_bar
 p2+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
 
 
-prop3=as.numeric(apply(full_dat[full_dat$ind==2,7:40], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==2,])[1]))
+prop3=as.numeric(apply(full_dat[full_dat$ind==2,7:37], 2, function(x) sum(x,na.rm = T)/dim(full_dat[full_dat$ind==2,])[1]))
 skills_pharm=data.frame(skill=colnames(skills),prop3=prop3)
 
 p3 <- ggplot(skills_pharm, aes(reorder(skill,-prop3), prop3)) + geom_bar(stat="identity") + 
   labs(x = 'Skill', y = 'Prop', title ='Figure c) Pharmaceutical Companies Skill Proportion ')
 p3+theme(axis.text.x=element_text(angle=90, hjust=1))+xlab("")
+
 
 ```
 
@@ -129,7 +125,7 @@ The following figures show the skill counts broken down by industries. Y axis st
 
 ```{r echo=FALSE,message=FALSE,warning=FALSE}
 #by industry
-skills_by_industry=as.data.frame(full_dat[,6:40]%>%group_by(industry_clean)%>%summarise_each(funs(mean(., na.rm=TRUE))))
+skills_by_industry=as.data.frame(full_dat[,6:37]%>%group_by(industry_clean)%>%summarise_each(funs(mean(., na.rm=TRUE))))
 tmp=cbind(as.character(skills1$skill),as.data.frame(t(skills_by_industry[,-1])))
 colnames(tmp)=c("skill",skills_by_industry$industry_clean)
 skills_by_industry1=gather(tmp,industry,value,-skill,factor_key = TRUE)

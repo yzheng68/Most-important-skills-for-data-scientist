@@ -1,0 +1,405 @@
+---
+title: "ds_job"
+output: html_document
+---
+
+```{r}
+
+installpkg <- function(x){
+    if(x %in% rownames(installed.packages())==FALSE) {
+        if(x %in% rownames(available.packages())==FALSE) {
+            paste(x,"is not a valid package - please check again...")
+        } else {
+            install.packages(x)           
+        }
+
+    } else {
+        paste(x,"package already installed...")
+    }
+}
+# install necessary packages
+required_packages  <- c("stringr","dplyr","tidyr","ggmap","rebus","pROC","knitr","ggplot2","maps")
+lapply(required_packages,installpkg)
+
+devtools::install_github("muschellij2/glassdoor")
+Sys.getenv("GLASSDOOR_PID")
+Sys.getenv("GLASSDOOR_PAT")
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(ggmap)
+library(rebus)
+library(pROC)
+library(knitr)
+library(ggplot2)
+library(maps)
+library(glassdoor)
+```
+
+```{r data_scraping,eval=FALSE}
+#CareerBuilder
+###data science jobs
+base="https://www.careerbuilder.com"
+url="https://www.careerbuilder.com/jobs-data-science"
+
+careerbuilder_results1=data.frame(title="",company="",location="",html="")
+for(i in 1:7){
+  
+  cat('Moving to Next 25 jobs\n')
+  
+  # Navigate to next page
+  new.page <- tryCatch({read_html(paste0(url,"?page_number=",i))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  if(length(new.page)!=0){
+  careerbuilder_results1_tmp=html_nodes(new.page,".job-row")
+  html_tmp=lapply(careerbuilder_results1_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
+  careerbuilder_results1_tmp=sapply(strsplit(html_text(careerbuilder_results1_tmp),"\n\n"),function(x) unlist(x)[unlist(x)!=""])
+careerbuilder_results1_tmp=sapply(careerbuilder_results1_tmp, function(x) unlist(x)[!unlist(x)%in%c("\nCAREERBUILDER APPLY","\nADVERTISEMENT","CAREERBUILDER APPLY","ADVERTISEMENT")])
+#some job will have "careerbuilder apply","advertisement",etc as the first list, remove these will make sure all the job title appear in the second list, company in the seventh list
+  careerbuilder_results1_tmp_df=data.frame(
+    title=gsub("\n","",unlist(lapply(careerbuilder_results1_tmp, function(x) x[2]))),
+    company=gsub("\n","",unlist(lapply(careerbuilder_results1_tmp, function(x) x[7]))),
+    location=gsub("\n","",unlist(lapply(lapply(careerbuilder_results1_tmp, function(x) 
+      x[grepl(paste(paste0("\\,\\s?",c(state.abb,"DC"),"$"),collapse = "|"),x)]),function(x) ifelse(length(x)>1,x[length(x)],ifelse(length(x)==0,NA,x))))),
+    html=html
+  )}else{
+    next
+  }
+careerbuilder_results1=rbind(careerbuilder_results1,careerbuilder_results1_tmp_df)
+Sys.sleep(2)
+}
+careerbuilder_results1=careerbuilder_results1[-1,]
+
+#scrape individual job link
+label=list()
+desc=list()
+for(i in 1:length(careerbuilder_results1$html)){
+    cat("Moving to",i,"job\n")
+
+  tmp=tryCatch({read_html(as.character(careerbuilder_results1$html[i]))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  if(length(tmp)!=0){
+  label[i]=tmp%>%html_nodes(".small-12+ .row .columns")%>%html_text()
+  desc[i]=paste(tmp%>%html_nodes(".description")%>%html_text(),collapse = "\n")}
+  else{
+    
+    label[i]=NA
+    desc[i]=NA
+  }
+  Sys.sleep(1)
+}
+
+careerbuilder_results1=careerbuilder_results1%>%mutate(label=unlist(label),desc=unlist(desc))%>%filter(!is.na(desc))
+
+###statistics jobs
+url="https://www.careerbuilder.com/jobs-statistics"
+careerbuilder_results=data.frame(title="",company="",location="",html="")
+for(i in 1:10){
+  
+  cat('Moving to Next 25 jobs\n')
+  
+  # Navigate to next page
+  new.page <- tryCatch({read_html(paste0(url,"?page_number=",i))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  if(length(new.page)!=0){
+  careerbuilder_results_tmp=html_nodes(new.page,".job-row")
+  html_tmp=lapply(careerbuilder_results_tmp,function(x) ifelse(length(html_nodes(x,"h2 a"))==0,"No html",html_nodes(x,"h2 a")%>%html_attr('href')))
+html=ifelse(html_tmp=="No html","No html",paste0(base,html_tmp))
+  careerbuilder_results_tmp=sapply(strsplit(html_text(careerbuilder_results_tmp),"\n\n"),function(x) unlist(x)[unlist(x)!=""])#split list by "\n" and remove empty lists
+careerbuilder_results_tmp=sapply(careerbuilder_results_tmp, function(x) unlist(x)[!unlist(x)%in%c("\nCAREERBUILDER APPLY","\nADVERTISEMENT","CAREERBUILDER APPLY","ADVERTISEMENT")])
+  careerbuilder_results_tmp_df=data.frame(
+    title=gsub("\n","",unlist(lapply(careerbuilder_results_tmp, function(x) x[2]))),
+    company=gsub("\n","",unlist(lapply(careerbuilder_results_tmp, function(x) x[7]))),
+    location=gsub("\n","",unlist(lapply(lapply(careerbuilder_results1_tmp, function(x) 
+      x[grepl(paste(paste0("\\,\\s?",c(state.abb,"DC"),"$"),collapse = "|"),x)]),function(x) ifelse(length(x)>1,x[length(x)],ifelse(length(x)==0,NA,x))))),
+    html=html
+  )}else{
+    next
+  }
+careerbuilder_results=rbind(careerbuilder_results,careerbuilder_results_tmp_df)
+Sys.sleep(2)
+}
+
+careerbuilder_results=careerbuilder_results[-1,]
+careerbuilder_results=careerbuilder_results[!duplicated(careerbuilder_results)&!grepl(or("data.scien.+",".+engineer"),careerbuilder_results$title,ignore.case = TRUE),]#remove duplicated listings and those contain "data science" or "engineer" in the job title
+
+#scrape individual job link
+label=list()
+desc=list()
+for(i in 1:length(careerbuilder_results$html)){
+    cat("Moving to",i,"job\n")
+
+  tmp=tryCatch({read_html(as.character(careerbuilder_results$html[i]))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  if(length(tmp)!=0){
+  label[i]=tmp%>%html_nodes(".small-12+ .row .columns")%>%html_text()
+  #label[i]=unlist(strsplit(label,"\n"))[unlist(strsplit(label,"\n"))!=""]
+  desc[i]=paste(tmp%>%html_nodes(".description")%>%html_text(),collapse = "\n")}
+  else{
+    label[i]=NA
+    desc[i]=NA
+  }
+  Sys.sleep(1)
+}
+
+careerbuilder_results=careerbuilder_results%>%mutate(label=unlist(label),desc=unlist(desc))%>%filter(!is.na(desc))
+#combine data science job and statistical job
+
+careerbuilder_all=rbind(careerbuilder_results1,careerbuilder_results)%>%mutate(jobtype=c(rep("data science",dim(careerbuilder_results1)[1]),rep("stat",dim(careerbuilder_results)[1])))
+
+careerbuilder_all=careerbuilder_all[!duplicated(careerbuilder_all),]
+
+#extract industry information
+label=sapply(str_split(careerbuilder_all$label,"\n"),function(x) unlist(x)[unlist(x)!=""])
+careerbuilder_all$industry=unlist(sapply(label,function(x) ifelse(!x[length(x)]%in%c("Relocation - No","Relocation - Yes"),x[length(x)],x[length(x)-1])))
+
+#write.csv(careerbuilder_all,"careerbuilder_all.csv")
+
+##stack_overflow
+###data science job
+stack1=data.frame(title="",company="",location="",experience="",html="")
+
+for(i in 1:5){
+url=paste0("https://stackoverflow.com/jobs?sort=i&q=data+science&l=United+States&d=20&u=Miles&pg=",i)
+stackoverflow=read_html(url)
+results=html_nodes(stackoverflow,".-job-summary")
+results_tmp=sapply(strsplit(html_text(results),"\r\n"),str_trim)%>%sapply(function(x) x[x!=""])
+results1=data.frame(
+  title=unlist(lapply(results_tmp, function(x) x[1])),
+  company=unlist(lapply(results_tmp, function(x) x[3])),
+  location=unlist(lapply(results_tmp, function(x) x[5])),
+  experience=unlist(lapply(results_tmp, function(x) x[length(x)]))
+)
+html0=unlist(lapply(lapply(stackoverflow%>%html_nodes("h2 a")%>%html_attrs(),function(x) strsplit(as.character(x),'\"')),function(x)x[2]))
+results1$html=paste0("https://stackoverflow.com",html0)
+stack1=rbind(stack1,results1)
+Sys.sleep(5)}
+stack1=stack1[-1,]
+
+##statistics job
+stack=data.frame(title="",company="",location="",experience="",html="")
+
+for(i in 1:4){
+  url=paste0("https://stackoverflow.com/jobs?sort=i&q=statistics&l=United+States&d=20&u=Miles&pg=",i)
+  stackoverflow=read_html(url)
+  results=html_nodes(stackoverflow,".-job-summary")
+  results_tmp=sapply(strsplit(html_text(results),"\r\n"),str_trim)%>%sapply(function(x) x[x!=""])
+  results1=data.frame(
+    title=unlist(lapply(results_tmp, function(x) x[1])),
+    company=unlist(lapply(results_tmp, function(x) x[3])),
+    location=unlist(lapply(results_tmp, function(x) x[5])),
+    experience=unlist(lapply(results_tmp, function(x) ifelse(startsWith(x[length(x)],"Be one"),x[length(x)-1],x[length(x)])
+  )))
+  html0=unlist(lapply(lapply(stackoverflow%>%html_nodes("h2 a")%>%html_attrs(),function(x) strsplit(as.character(x),'\"')),function(x)x[2]))
+  results1$html=paste0("https://stackoverflow.com",html0)
+  stack=rbind(stack,results1)
+  Sys.sleep(5)}
+
+stack=stack[-1,]
+stack=stack[!grepl(or("data.scien.+",".+engineer"),stack$title,ignore.case = TRUE),]
+stack_full=rbind(stack1,stack)%>%mutate(jobtype=c(rep("data science",dim(stack1)[1]),rep("stat",dim(stack)[1])),html=as.character(html))
+
+#scrape individual job link
+industry=list()
+desc=list()
+for (i in 1:length(stack_full$html)){
+  jd=read_html(stack_full$html[i])
+  tmp=as.vector((unlist(sapply((strsplit(html_text(html_nodes(jd,".-about-job")),"\r\n")),str_trim))))
+  tmp1=tmp[tmp!=""]
+  industry[i]=ifelse(length(which(tmp1=="Industry:"))==0,"No industry listed",tmp1[which(tmp1=="Industry:")+1])
+  tmp2=html_text(html_nodes(jd,".-skills-requirements , .-job-description"))
+  desc[i]=ifelse(length(tmp2)>1,paste(tmp2,collapse = '\"'),tmp2)
+  Sys.sleep(2)
+}
+
+stack_full$industry=unlist(industry)
+stack_full$desc=unlist(desc)
+#write.csv(stack_full,file="data_science.csv")
+
+#combine listings from careerbuilder and stackoverflow
+full_dat=data.frame(title=c(as.character(careerbuilder_all$title),as.character(stack_full$title)),company=c(as.character(careerbuilder_all$company),as.character(stack_full$company)),location=c(as.character(careerbuilder_all$location),as.character(stack_full$location)),desc=c(as.character(careerbuilder_all$desc),as.character(stack_full$desc)),industry=c(as.character(careerbuilder_all$industry),as.character(stack_full$industry)),ind=c(rep(0,dim(careerbuilder_all)[1]),rep(1,dim(stack_full)[1])),jobtype=c(careerbuilder_all$jobtype,stack_full$jobtype))
+full_dat=full_dat[!duplicated(full_dat),]
+
+
+###retrieve lon/lat
+full_dat$location=as.character(full_dat$location)
+geo=lapply(full_dat$location,geocode)
+full_dat$lon=unlist(lapply(geo,function(x) x$lon))
+full_dat$lat=unlist(lapply(geo,function(x) x$lat))
+#1 missing lon&lat because the corresponding location contains other words besides city, state,manully correct it and retrieve the geocode to replace the NA
+full_dat$location[is.na(full_dat$lat)]="Massachusetts, MA"
+full_dat$lon[is.na(full_dat$lon)]=geocode("Massachusetts, MA")$lon
+full_dat$lat[is.na(full_dat$lat)]=geocode("Massachusetts, MA")$lat
+
+
+###clean industry
+industry1=sapply(full_dat$industry,function(x) tolower(str_trim(str_replace_all(x, "[^[:alnum:]]", " "))))
+
+
+full_dat$industry_clean=ifelse(str_detect(industry1,or("education","academia","academic","research")),'Education',ifelse(str_detect(industry1,or('health','health'%R%optional(one_or_more(SPC))%R%'care','biotech.+',"lifescience","pharm.+")),'Health Care',ifelse(str_detect(industry1,or('finan.+','insurance','bank.+','capital','b2b','business',"trade.+","investments","accounting")),'Finance',ifelse(str_detect(industry1,'telecommunication'),'Telecommunications',ifelse(str_detect(industry1,'real estate'),'Real Estate',ifelse(str_detect(industry1,'energy'),'Oil, Gas, Energy & Utilities',ifelse(str_detect(industry1,or('media','entertain.+','gaming','marketing','advertis.+','^ad.+','magazine.+',"market")),'Media',ifelse(str_detect(industry1,or('consulting',"management","consultant","human resource","customer","staffing","professional","strategy")),'Business Services',ifelse(str_detect(industry1,or('commerc.+',"retail","sales","consumer")),"Retail",ifelse(str_detect(industry1,or('.+tech','software','cloud','internet','cyber','^it'%R%SPC,'web','saas','speech','computing','artificial intelligence'
+,"fraud")),'Information Technology',ifelse(str_detect(industry1,or("travel","tourism","hotel")),"Tourism",ifelse(str_detect(industry1,'defense'),"Aerospace & Defense",ifelse(str_detect(industry1,"agriculture"),"Agriculture & Forestry",ifelse(str_detect(industry1,or("automotive","automobile","construction","engineering","electronics","quality","transportation","manufacturing","supply","warehouse")),"Manufacturing",ifelse(str_detect(industry1,or("federal","government")),"Government",ifelse(str_detect(industry1,or("nonprofit","social service")),"Non-Profit",industry1))))))))))))))))
+
+unknown_company=full_dat[!full_dat$industry_clean%in%c("Aerospace & Defense","Agriculture & Forestry","Business Services","Education","Finance","Government","Health Care","Information Technology","Manufacturing","Media","Oil, Gas, Energy & Utilities","Retail","Telecommunications","Tourism"),c("company","industry_clean")]
+###retrieve industry information using glassdoor
+for(i in 1:dim(unknown_company)[1]){
+    cat(i)
+agent = gd_user_agent()
+if (have_gd_tokens()) {
+  res = tryCatch({gd_company(
+    q =as.character(unknown_company[i,"company"]))},error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+  if(length(res$content$response$employers)!=0){
+    unknown_company[i,"industry_clean"]=ifelse("sectorName"%in%names(res$content$response$employers[[1]]),res$content$response$employers[[1]]$sectorName,ifelse(industry%in%names(res$content$response$employers[[1]],res$content$response$employers[[1]]$industry,"no industry listed")))
+  }else{
+    next
+  }
+   
+Sys.sleep(3)
+}}
+
+unknown_company$industry_clean=ifelse(unknown_company$industry_clean=="Biotech & Pharmaceuticals","Health Care",ifelse(unknown_company$industry_clean=="Insurance","Finance",ifelse(unknown_company$industry_clean=="Transportation & Logistics","Manufacturing",ifelse(unknown_company$industry_clean=="Travel & Tourism","Tourism",unknown_company$industry_clean))))
+                                                                                                       
+full_dat[!full_dat$industry_clean%in%c("Aerospace & Defense","Agriculture & Forestry","Business Services","Education","Finance","Government","Health Care","Information Technology","Manufacturing","Media","Oil, Gas, Energy & Utilities","Retail","Telecommunications","Tourism"),"industry_clean"]=unknown_company$industry_clean
+
+##extract education information
+edu=data.frame(master=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("master","masters","\\bms\\b","\\bma\\b"),x, ignore.case=TRUE)))),
+           phd=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("\\bphd\\b","doctor","doctoral"),x, ignore.case=TRUE)))),
+           undergrad=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("bachelor","bachelors","undergrad","undergraduate","\\bbs\\b","\\bba\\b"),x, ignore.case=TRUE)))))
+edu$highest_edu=ifelse(edu$phd==1,"phd",ifelse(edu$master==1,"ms","bachelor"))
+
+full_dat$highest_edu=edu$highest_edu
+
+#write.csv(full_dat,"full_dat.csv")
+```
+
+```{r figure1,echo=FALSE,warning=FALSE,message=FALSE}
+full_dat=read.csv("full_dat_update1020.csv")[,-1]
+map<-get_map(location=geocode("united states"), zoom=4, maptype = "terrain",source='google',color='color')
+
+map1=full_dat[full_dat$jobtype=="data science",]%>%group_by(location,lon,lat)%>%summarise(count=n())
+gmap=ggmap(map)+geom_point(aes(x=lon, y=lat,size=count), data= map1,alpha=0.5,col="orange")+ 
+xlab("longitude") +
+ylab("latitude")+scale_size_continuous(range = c(1, 9))+ggtitle("Figure 1.(a) Geospatial Distribution of Data Science Jobs")
+gmap
+
+count_by_city=arrange(map1,desc(count))[1:10,]
+ggplot(count_by_city,aes(x=reorder(location,-count),y=count,width=0.9))+geom_bar(aes(fill=count),stat = "identity",position = "dodge") + scale_color_gradient2()+theme_bw() + theme(axis.text.x=element_text(angle=90, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))+labs(x = 'City', y = 'Count', title ='(b).# of Data Science Jobs by City (Top 10)')
+```
+
+```{r figure2,echo=FALSE,message=FALSE,warning=FALSE}
+
+skills=data.frame(hadoop=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sHadoop\\b",x, ignore.case=TRUE)))),
+           python=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sPython\\b",x, ignore.case=TRUE)))),
+           sql=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("\\smysql\\b","\\snosql\\b", "\\ssql\\b"),x, ignore.case=TRUE)))),
+           r=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sR\\b",x, ignore.case=TRUE)))),
+          spark=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sSpark\\b",x, ignore.case=TRUE)))),
+          sas=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sSas\\b",x, ignore.case=TRUE)))),
+          aws=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("amazon"%R%optional(one_or_more(SPC))%R%"web"%R%optional(one_or_more(SPC))%R%"service","\\saws\\b"),x, ignore.case=TRUE)))),
+          excel=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sExcel\\b",x, ignore.case=TRUE)))),
+          azure=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sAzure\\b",x, ignore.case=TRUE)))),
+          java=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or("\\sjava\\b","\\sjavascript\\b"),x, ignore.case=TRUE)))),
+          tableau=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sTableau\\b",x, ignore.case=TRUE)))),
+machine_learning=as.numeric(sapply(full_dat$desc,function(x) any(grepl("machine.learning",x, ignore.case=TRUE)))),
+ai=as.numeric(sapply(full_dat$desc,function(x) any(grepl("artificial.intelligence",x, ignore.case=TRUE)))),
+      pandas=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\spandas\\b",x, ignore.case=TRUE)))),
+      scipy=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sscipy\\b",x, ignore.case=TRUE)))),
+      perl=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sperl\\b",x, ignore.case=TRUE)))),
+      text_mining=as.numeric(sapply(full_dat$desc,function(x) any(grepl("text.mining",x, ignore.case=TRUE)))),
+      matlab=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\smatlab\\b",x, ignore.case=TRUE)))),
+      c=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sC\\b",x, ignore.case=TRUE)))),
+  spss=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sspss\\b",x, ignore.case=TRUE)))),
+        hive=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\shive\\b",x, ignore.case=TRUE)))),
+      splunk=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\ssplunk\\b",x, ignore.case=TRUE)))),
+data_mining=as.numeric(sapply(full_dat$desc,function(x) any(grepl("data.mining",x, ignore.case=TRUE)))),
+unix_linux=as.numeric(sapply(full_dat$desc,function(x) any(grepl(or(SPC%R%"unix"%R%SPC,SPC%R%"linux"%R%SPC),x, ignore.case=TRUE)))),
+apache=as.numeric(sapply(full_dat$desc,function(x) any(grepl("\\sapache\\b",x, ignore.case=TRUE)))))
+full_dat=cbind(full_dat,skills)
+
+ds.ct=as.numeric(apply(full_dat[full_dat$jobtype=="data science",11:35], 2, function(x) sum(x,na.rm = T)))
+ds.skills1=data.frame(skill=colnames(full_dat[full_dat$jobtype=="data science",11:35]),ct=ds.ct)
+ds.skills1$prop=ds.skills1$ct/sum(full_dat$jobtype=="data science")
+
+
+stat.ct=as.numeric(apply(full_dat[full_dat$jobtype=="stat",11:35], 2, function(x) sum(x,na.rm = T)))
+stat.skills1=data.frame(skill=colnames(full_dat[full_dat$jobtype=="stat",11:35]),ct=stat.ct)
+stat.skills1$prop=stat.skills1$ct/sum(full_dat$jobtype=="stat")
+
+skills1=rbind(ds.skills1,stat.skills1)%>%mutate(jobtype=c(rep("data science",dim(ds.skills1)[1]),rep("stat",dim(stat.skills1)[1])))
+skills1=skills1[skills1$skill%in%arrange(ds.skills1,desc(prop))$skill[1:15],
+]
+ggplot(skills1,aes(x = reorder(skill,prop),y = prop,width=.65)) + 
+    geom_bar(aes(fill = jobtype),stat = "identity",position = "dodge")+ labs(x = 'Skill', y = 'Proportion', title ='Figure 2. (a) Skill Proportion by Job')+theme(axis.text.x=element_text(angle=90, hjust=1))+coord_flip()
+
+#by industry
+#examine number of job listings broken down by industries
+ct_by_industry=as.data.frame(full_dat[full_dat$jobtype=="data science",]%>%group_by(industry_clean)%>%summarise(Job_counts=n())%>%arrange(desc(Job_counts)))[1:10,]
+
+skills_by_industry=as.data.frame(full_dat[full_dat$jobtype=="data science",c("industry_clean",colnames(skills))]%>%group_by(industry_clean)%>%summarise_all(funs(mean(., na.rm=TRUE))))
+tmp=cbind(as.character(ds.skills1$skill),as.data.frame(t(skills_by_industry[,-1])))
+colnames(tmp)=c("skill",as.character(skills_by_industry$industry_clean))
+skills_by_industry1=gather(tmp,industry,value,-skill,factor_key = TRUE)%>%filter(industry%in%c("Information Technology","Health Care","Finance","Business Services")&skill%in%arrange(ds.skills1,desc(prop))$skill[1:10])
+
+ggplot(skills_by_industry1,aes(x = reorder(skill,value),y = value,width=.65)) + 
+    geom_bar(aes(fill = industry),stat = "identity",position = "dodge")+ labs(x = 'Skill', y = 'Proportion', title ='(b). Skill Proportion by Industry')+theme(axis.text.x=element_text(angle=90, hjust=1))+coord_flip()
+
+skills_by_edu=as.data.frame(full_dat[full_dat$jobtype=="data science",c("highest_edu",colnames(skills))]%>%group_by(highest_edu)%>%summarise_all(funs(mean(., na.rm=TRUE))))
+tmp=cbind(as.character(ds.skills1$skill),as.data.frame(t(skills_by_edu[,-1])))
+colnames(tmp)=c("skill",as.character(skills_by_edu$highest_edu))
+skills_by_edu1=gather(tmp,edu,value,-skill,factor_key = TRUE)%>%filter(skill%in%arrange(ds.skills1,desc(prop))$skill[1:10])
+
+ggplot(skills_by_edu1,aes(x = reorder(skill,value),y = value,width=.65)) + 
+    geom_bar(aes(fill = edu),stat = "identity",position = "dodge")+ labs(x = 'Skill', y = 'Proportion', title ='(c). Skill Proportion by Education Requirement')+theme(axis.text.x=element_text(angle=90, hjust=1))+coord_flip()
+
+ggplot(ct_by_industry,aes(x=reorder(industry_clean,-Job_counts),y=Job_counts,width=0.9))+geom_bar(aes(fill=Job_counts),stat = "identity",position = "dodge") + scale_colour_gradientn(colours=c("white", "dodgerblue")) +theme_bw() + theme(axis.text.x=element_text(angle=90, hjust=1),panel.border = element_blank(), panel.grid.major = element_blank(),panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))+labs(x = 'Industry', y = 'Count', title ='(d). # of Data Science Job Listings by Industry')
+```
+
+
+```{r ttest, echo=FALSE,warning=FALSE,message=FALSE}
+skill_ttest_job=data.frame(skill=colnames(skills),tstat=unlist(lapply(apply(full_dat[,c(colnames(skills))],2,function(x) t.test(x[full_dat$jobtype=="data science"],x[full_dat$jobtype=="stat"],alternative = "greater")),function(x) round(x$statistic,4))),p_val=unlist(lapply(apply(full_dat[,c(colnames(skills))],2,function(x) t.test(x[full_dat$jobtype=="data science"],x[full_dat$jobtype=="stat"],alternative = "greater")),function(x) round(x$p.value,4))))%>%mutate(`Compare at 0.05/25 significance level`=ifelse(p_val<=0.05/length(colnames(skills)),"*"," "))
+cat("Table1.Two Sample t-tests to Compare Skill Counts of Data Science Jobs and Statistics Jobs")
+p_perm=matrix(0,nrow = 1000,ncol=25)
+#permutation
+  set.seed(123)
+  for(j in 1:1000){
+       skill_ttest_temp=list()
+for(i in 1:100){
+  full_dat_temp=full_dat
+  ind=sample(1:dim(full_dat_temp)[1],293,replace = FALSE)
+  full_dat_temp[ind,"jobtype"]="data science"
+  full_dat_temp[-ind,"jobtype"]="stat"
+skill_ttest_temp[[i]]=data.frame(skill=colnames(skills),tstat=unlist(lapply(apply(full_dat_temp[,c(colnames(skills))],2,function(x) t.test(x[full_dat_temp$jobtype=="data science"],x[full_dat_temp$jobtype=="stat"],alternative = "greater")),function(x) x$statistic)))
+}
+p_perm[j,]=apply(cbind(skill_ttest_job$tstat,sapply(skill_ttest_temp, function(x) x$tstat)),1,function(x) mean(x[-1]>=x[1]))}
+
+skill_ttest_job=skill_ttest_job%>%mutate(p_value_permutation=apply(p_perm,2,mean),sd=apply(p_perm, 2, sd))%>%mutate(`95% CI for P-value lb`=ifelse(p_value_permutation-1.96*sd<0,0,p_value_permutation-1.96*sd),`95% CI for P-value ub`=ifelse(p_value_permutation+1.96*sd>1,1,p_value_permutation+1.96*sd),`Compare at 0.05/25 significance level 1`=ifelse(p_value_permutation<=0.05/25,"*"," "))
+kable(arrange(skill_ttest_job,p_val))
+
+```
+*Each test is evaluated at a significance level of* $\alpha/25$ *to adjust for multiple test issue.*
+
+```{r logisticmodel, echo=FALSE,warning=FALSE,message=FALSE}
+#fit logistic regression model to examine association between degree requirement and skill requirement
+data=full_dat[full_dat$jobtype=="data science",]
+data$y=ifelse(data$highest_edu=="phd",1,0)
+mod0=summary(glm(paste0("y~",paste(colnames(data)[11:35],collapse = "+")) ,family="binomial", data=data))
+table2=data.frame(Estimate=round(mod0$coefficients[-1,1],4),Std.Error=round(mod0$coefficients[-1,2],4),P_value=round(mod0$coefficients[-1,4],4),`exp(coef)`=round(exp(mod0$coefficients[-1,1]),2),`95%CI lb`=round(exp(mod0$coefficients[-1,1]-1.96*mod0$coefficients[-1,2]),3),`95%CI ub`=round(exp(mod0$coefficients[-1,1]+1.96*mod0$coefficients[-1,2]),3))
+model=paste0("y~",paste(colnames(data)[11:35],collapse = "+"))
+kable(table2)
+#10-fold cross-validated roc
+set.seed(1)
+id_rand=runif(dim(data)[1])
+  n_fold=10
+  cv_group=ntile(id_rand, n_fold)
+
+  # initialization
+  cv_results=array(0,c(0,2))
+  colnames(cv_results)=c("Truth","Prob")
+  # begin cv
+  for (i in 1:n_fold)
+  {
+    data_train=data.frame(data[cv_group!=i,])
+    data_test=data.frame(data[cv_group==i,])
+
+  fit_temp <- glm(model,family =binomial(),data=data_train)
+    cv_results=rbind(cv_results,data.frame(Truth=data_test$y,Prob=predict(fit_temp,data_test,type="response"),fold=i))
+  }
+  ROC_Z_cv=roc(cv_results$Truth,cv_results$Prob)
+  
+```
+
